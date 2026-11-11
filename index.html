@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#174d39">
+  <meta name="description" content="EcoCoin recycling rewards and bottle scanner">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="EcoCoin">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="application-name" content="EcoCoin">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <title>EcoCoin | Smart Recycling</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+<header>
+  <div class="logo">♻ EcoCoin</div>
+  <span class="status">● MACHINE ONLINE</span>
+</header>
+
+<main>
+  <section class="welcome">
+    <h1>Welcome to EcoCoin</h1>
+    <p>Turn your recyclable materials into rewards.</p>
+  </section>
+
+  <section class="machine">
+    <div class="machine-header">
+      <h2>EcoCoin Recycling Station</h2>
+      <span>Machine ID: ECO-001</span>
+    </div>
+
+    <div class="content">
+      <section>
+        <h2>EcoCoin Bottle App</h2>
+        <p class="limit-note">Scan an EcoCoin QR label or enter quantities manually. Scanned items are added to the same totals below.</p>
+
+        <div class="scanner-card">
+          <div class="scanner-heading">
+            <span class="scanner-icon">📷</span>
+            <div>
+              <h3>Scan Bottle / Material QR</h3>
+              <small>Use an EcoCoin QR label for each material type.</small>
+            </div>
+          </div>
+          <video id="cameraPreview" playsinline muted hidden></video>
+          <div id="scanPlaceholder" class="scan-placeholder">
+            <span>▦</span>
+            <p>Camera preview will appear here</p>
+          </div>
+          <div class="scanner-actions">
+            <button type="button" id="startScanBtn" class="add-btn">Start Camera Scanner</button>
+            <button type="button" id="stopScanBtn" class="secondary-btn" disabled>Stop Scanner</button>
+          </div>
+          <p id="scanStatus" class="scan-status" aria-live="polite">Scanner is stopped. Camera access requires HTTPS or localhost. If QR scanning is unavailable on your iPhone browser, use Manual Material Input.</p>
+          <details class="qr-help">
+            <summary>What QR code format should I use?</summary>
+            <p>QR content example:</p>
+            <code>ECOCOIN:plastic:1</code>
+            <p>Supported materials: <b>plastic</b>, <b>cans</b>, and <b>cardboard</b>. The last number is the quantity.</p>
+          </details>
+        </div>
+
+        <div class="photo-card">
+          <div class="scanner-heading">
+            <span class="scanner-icon">🖼️</span>
+            <div>
+              <h3>Photo Material Detection</h3>
+              <small>Choose a photo with recyclable objects. The detector runs in your browser.</small>
+            </div>
+          </div>
+          <label class="photo-label" for="materialPhoto">Choose / Take Photo</label>
+          <input id="materialPhoto" type="file" accept="image/*" capture="environment">
+          <img id="photoPreview" alt="Selected recyclable materials preview" hidden>
+          <div class="photo-actions">
+            <button type="button" id="detectPhotoBtn" class="add-btn" disabled>Detect Materials</button>
+            <button type="button" id="clearPhotoBtn" class="secondary-btn">Clear Photo</button>
+          </div>
+          <p id="photoStatus" class="scan-status" aria-live="polite">Select a clear photo to begin. For best results, use good lighting and keep objects separated.</p>
+          <div id="photoResults" class="photo-results" hidden>
+            <h4>Detected Objects — review each material</h4>
+            <div id="detectedItems"></div>
+            <button type="button" id="addDetectedBtn" class="add-btn" disabled>Add Confirmed Items</button>
+          </div>
+          <p class="photo-disclaimer">AI suggestions are not guaranteed. Check the material dropdown before adding items. This prototype does not weigh materials or verify recyclability.</p>
+        </div>
+
+        <h2 class="materials-title">Manual Material Input</h2>
+        <p id="manualInputLockNotice" class="limit-note" role="status">🔒 Upload a photo and successfully detect recyclable materials to unlock manual input.</p>
+        <p class="limit-note">Maximum of 100 items per material per transaction.</p>
+
+        <div class="material">
+          <div class="icon">🧴</div>
+          <div class="info">
+            <h3>Plastic Bottles</h3><p>₱1.00 per item</p>
+            <small>Subtotal: <strong id="plasticAmount">₱0.00</strong></small>
+          </div>
+          <div class="material-controls">
+            <div class="counter">
+              <button type="button" data-material="plastic" data-change="-1" disabled>−</button>
+              <span id="plasticCount">0</span>
+              <button type="button" data-material="plastic" data-change="1" disabled>+</button>
+            </div>
+            <div class="quick-add">
+              <input id="plasticInput" type="number" min="1" max="100" step="1" placeholder="Qty" aria-label="Plastic bottle quantity" disabled>
+              <button type="button" class="add-btn" data-add="plastic" disabled>Add</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="material">
+          <div class="icon">🥫</div>
+          <div class="info">
+            <h3>Aluminum Cans</h3><p>₱2.00 per item</p>
+            <small>Subtotal: <strong id="cansAmount">₱0.00</strong></small>
+          </div>
+          <div class="material-controls">
+            <div class="counter">
+              <button type="button" data-material="cans" data-change="-1" disabled>−</button>
+              <span id="cansCount">0</span>
+              <button type="button" data-material="cans" data-change="1" disabled>+</button>
+            </div>
+            <div class="quick-add">
+              <input id="cansInput" type="number" min="1" max="100" step="1" placeholder="Qty" aria-label="Aluminum can quantity" disabled>
+              <button type="button" class="add-btn" data-add="cans" disabled>Add</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="material">
+          <div class="icon">📦</div>
+          <div class="info">
+            <h3>Cardboard</h3><p>₱0.50 per item</p>
+            <small>Subtotal: <strong id="cardboardAmount">₱0.00</strong></small>
+          </div>
+          <div class="material-controls">
+            <div class="counter">
+              <button type="button" data-material="cardboard" data-change="-1" disabled>−</button>
+              <span id="cardboardCount">0</span>
+              <button type="button" data-material="cardboard" data-change="1" disabled>+</button>
+            </div>
+            <div class="quick-add">
+              <input id="cardboardInput" type="number" min="1" max="100" step="1" placeholder="Qty" aria-label="Cardboard quantity" disabled>
+              <button type="button" class="add-btn" data-add="cardboard" disabled>Add</button>
+            </div>
+          </div>
+        </div>
+        <p class="note">The scanner and manual input both update the same transaction totals.</p>
+      </section>
+
+      <section>
+        <h2>Transaction Summary</h2>
+        <div class="display">
+          <small>TOTAL REWARD</small>
+          <h1 id="displayTotal">₱0.00</h1>
+          <p>Total Items: <span id="displayItems">0</span></p>
+        </div>
+        <div class="summary">
+          <p>Plastic Bottles <span id="summaryPlastic">₱0.00</span></p>
+          <p>Aluminum Cans <span id="summaryCans">₱0.00</span></p>
+          <p>Cardboard <span id="summaryCardboard">₱0.00</span></p>
+          <hr>
+          <p><strong>Total Reward</strong><strong id="summaryTotal">₱0.00</strong></p>
+        </div>
+
+        <label for="payment">Payout Method</label>
+        <select id="payment">
+          <option value="Cash">Cash</option>
+          <option value="Cashless">Cashless</option>
+        </select>
+        <div id="cashlessFields" hidden>
+          <label for="wallet">E-Wallet</label>
+          <select id="wallet"><option value="GCash">GCash</option><option value="Maya">Maya</option></select>
+          <label for="account">Mobile Number</label>
+          <input type="tel" id="account" placeholder="09XXXXXXXXX" maxlength="11" inputmode="numeric">
+          <small class="input-note">Enter your 11-digit mobile number.</small>
+        </div>
+        <button type="button" class="confirm" id="confirmBtn" disabled>Confirm Transaction</button>
+        <button type="button" class="reset" id="resetBtn">Reset Machine</button>
+        <p id="message" class="message" aria-live="polite"></p>
+      </section>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="receiptModal" hidden>
+  <div class="receipt">
+    <h2>♻ EcoCoin</h2><h3>Transaction Receipt</h3>
+    <p>Transaction ID: <span id="receiptID"></span></p>
+    <p>Date: <span id="receiptDate"></span></p><hr>
+    <p>Plastic Bottles: <span id="receiptPlastic"></span></p>
+    <p>Aluminum Cans: <span id="receiptCans"></span></p>
+    <p>Cardboard: <span id="receiptCardboard"></span></p>
+    <p>Total Items: <span id="receiptItems"></span></p>
+    <p>Payment Method: <span id="receiptPayment"></span></p>
+    <p id="receiptAccountRow" hidden>E-Wallet Account: <span id="receiptAccount"></span></p>
+    <hr><h2 id="receiptTotal">₱0.00</h2>
+    <p class="thank-you">Thank you for recycling with EcoCoin!</p>
+    <button type="button" id="printBtn">Print Receipt</button>
+    <button type="button" id="doneBtn">Done / New Transaction</button>
+  </div>
+</div>
+<footer>EcoCoin © 2026 | Turning Waste into Gain</footer>
+</body>
+</html>
